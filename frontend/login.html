@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="hero">
+    <div class="login-box">
+      <h2>Login</h2>
+      <input id="email" type="email" placeholder="Email">
+      <input id="pass" type="password" placeholder="Password">
+      <button class="btn" onclick="login()">Enter</button>
+    </div>
+  </div>
+  <script>
+    function login() {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("pass").value;
+      if (email === "admin@quant.com" && pass === "1234") {
+        localStorage.setItem("auth", "true");
+        window.location.href = "dashboard.html";
+      } else {
+        alert("Invalid login");
+      }
+    }
+  </script>
+</body>
+</html>

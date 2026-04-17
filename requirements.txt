@@ -1,4 +1,5 @@
-yfinance
-pandas
+flask
 numpy
+pandas
 matplotlib
+yfinance

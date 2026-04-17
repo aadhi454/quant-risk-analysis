@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quant Risk</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="hero">
+    <h1>Quant Risk Intelligence</h1>
+    <p>Advanced portfolio risk analytics</p>
+    <h3 id="market">Market: Loading...</h3>
+    <button class="btn" onclick="location.href='login.html'">Login</button>
+  </div>
+  <script>
+    const hour = new Date().getHours();
+    document.getElementById("market").innerText = (hour >= 9 && hour <= 15) ? "Market OPEN" : "Market CLOSED";
+  </script>
+</body>
+</html>

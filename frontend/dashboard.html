@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <script>
+    if (localStorage.getItem("auth") !== "true") {
+      window.location.href = "login.html";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="brand">Quant Risk</div>
+      <p onclick="go('dashboard.html')">Dashboard</p>
+      <p onclick="go('portfolio.html')">Portfolio</p>
+      <p onclick="go('settings.html')">Settings</p>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 class="title">Dashboard</h1>
+          <p class="subtitle">Live simulation overview</p>
+        </div>
+        <span class="status-chip" id="backend-status">Backend: Loading...</span>
+      </div>
+
+      <div class="panel">
+        <h4>Metrics</h4>
+        <div id="metrics" class="metric-grid"></div>
+      </div>
+
+      <div class="panel">
+        <h4>Price Chart</h4>
+        <div id="chart" class="chart-box"></div>
+      </div>
+
+      <div class="panel">
+        <h4>Risk Distribution</h4>
+        <div id="dist" class="chart-box"></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

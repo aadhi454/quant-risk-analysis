@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Settings</title>
+  <script>
+    if (localStorage.getItem("auth") !== "true") {
+      window.location.href = "login.html";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="brand">Quant Risk</div>
+      <p onclick="go('dashboard.html')">Dashboard</p>
+      <p onclick="go('portfolio.html')">Portfolio</p>
+      <p onclick="go('settings.html')">Settings</p>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 class="title">Settings</h1>
+          <p class="subtitle">Session controls</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>Account</h4>
+        <p>Logged in as <strong>admin@quant.com</strong></p>
+        <button class="btn secondary" onclick="logout()">Logout</button>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
