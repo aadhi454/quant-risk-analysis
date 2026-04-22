@@ -1,66 +1,29 @@
-from __future__ import annotations
-
-import json
-from pathlib import Path
-
 import numpy as np
 
-
-def simulate_gbm_paths(
-    last_price: float,
-    mean_return: float,
-    volatility: float,
-    days: int,
-    simulations: int,
-    random_seed: int | None = None,
-) -> np.ndarray:
+def run_monte_carlo(current_price, daily_return, daily_volatility, days_to_simulate=252, num_simulations=1000):
     """
-    Simulate future prices with Geometric Brownian Motion.
-
-    The mean return and volatility are assumed to be daily estimates, so the
-    time step is one trading day.
+    Executes a Geometric Brownian Motion (GBM) Monte Carlo simulation.
     """
-    if last_price <= 0:
-        raise ValueError("Last price must be greater than zero.")
-    if days <= 0:
-        raise ValueError("Number of days must be greater than zero.")
-    if simulations <= 0:
-        raise ValueError("Number of simulations must be greater than zero.")
-    if volatility < 0:
-        raise ValueError("Volatility cannot be negative.")
-
-    if random_seed is not None:
-        np.random.seed(random_seed)
-
-    time_step = 1.0
-    drift = (mean_return - 0.5 * volatility**2) * time_step
-    diffusion = volatility * np.sqrt(time_step)
-
-    shocks = np.random.normal(size=(days, simulations))
-    log_returns = drift + diffusion * shocks
-    future_paths = last_price * np.exp(np.cumsum(log_returns, axis=0))
-
-    return np.vstack([np.full(simulations, last_price), future_paths])
-
-
-def export_simulation_paths(
-    simulated_prices: np.ndarray,
-    output_path: str | Path = "simulation.json",
-) -> Path:
-    """Export simulation paths in a frontend-friendly JSON format.
-
-    The exported structure is:
-    {
-      "paths": [[...], [...], ...]
+    dt = 1 # 1 day step
+    
+    # Initialize price matrix (Days x Simulations)
+    price_matrix = np.zeros((days_to_simulate, num_simulations))
+    price_matrix[0] = current_price
+    
+    # Run the GBM formula for every path simultaneously
+    for t in range(1, days_to_simulate):
+        random_shock = np.random.normal(0, 1, num_simulations)
+        drift = (daily_return - 0.5 * daily_volatility**2) * dt
+        shock = daily_volatility * np.sqrt(dt) * random_shock
+        price_matrix[t] = price_matrix[t-1] * np.exp(drift + shock)
+        
+    # Calculate the average expected price at the very end
+    expected_final_price = float(np.mean(price_matrix[-1]))
+    
+    # We only send 50 paths to the frontend so the browser doesn't freeze
+    chart_paths = price_matrix[:, :50].T.tolist()
+    
+    return {
+        "expected_final_price": expected_final_price,
+        "chart_paths": chart_paths
     }
-    where each inner array is one simulated price path over time.
-    """
-    if simulated_prices is None or simulated_prices.size == 0:
-        raise ValueError("Simulated prices are empty.")
-
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    payload = {"paths": simulated_prices.T.tolist()}
-    output_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return output_file

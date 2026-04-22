@@ -1,30 +1,36 @@
-from __future__ import annotations
-
 import numpy as np
 
-
-def calculate_var_cvar(
-    final_prices: np.ndarray,
-    current_price: float,
-    confidence_level: float = 0.95,
-) -> tuple[float, float]:
+def calculate_metrics(returns, confidence_level=0.95):
     """
-    Calculate VaR and Expected Shortfall using terminal losses.
-
-    The result is returned as a fraction of current price, so 0.05 means 5%.
+    Calculates key risk metrics based on historical log returns.
     """
-    if final_prices is None or len(final_prices) == 0:
-        raise ValueError("Final prices are empty.")
-    if current_price <= 0:
-        raise ValueError("Current price must be greater than zero.")
-    if not 0 < confidence_level < 1:
-        raise ValueError("Confidence level must be between 0 and 1.")
+    if not returns or len(returns) == 0:
+        return None
 
-    terminal_returns = final_prices / current_price - 1.0
-    losses = np.maximum(0.0, -terminal_returns)
-
-    var_level = np.percentile(losses, confidence_level * 100)
-    tail_losses = losses[losses >= var_level]
-    cvar_level = float(tail_losses.mean()) if tail_losses.size else float(var_level)
-
-    return float(var_level), float(cvar_level)
+    returns_array = np.array(returns)
+    
+    # 1. Mean and Volatility (Annualized assuming 252 trading days)
+    daily_mean = np.mean(returns_array)
+    daily_volatility = np.std(returns_array)
+    
+    annual_return = daily_mean * 252
+    annual_volatility = daily_volatility * np.sqrt(252)
+    
+    # 2. Historical Value at Risk (VaR)
+    # For a 95% confidence level, we find the 5th percentile of returns
+    alpha = 1.0 - confidence_level
+    var = np.percentile(returns_array, alpha * 100)
+    
+    # 3. Expected Shortfall (CVaR)
+    # The average of all returns that are worse than the VaR threshold
+    worse_returns = returns_array[returns_array <= var]
+    expected_shortfall = np.mean(worse_returns) if len(worse_returns) > 0 else var
+    
+    return {
+        "daily_return": daily_mean,
+        "annual_return": annual_return,
+        "daily_volatility": daily_volatility,
+        "annual_volatility": annual_volatility,
+        "var_95": var,  # This will be a negative number representing the loss threshold
+        "expected_shortfall_95": expected_shortfall # The average loss beyond VaR
+    }

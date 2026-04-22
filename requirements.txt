@@ -1,5 +1,6 @@
-flask
-numpy
-pandas
-matplotlib
-yfinance
+Flask==3.0.2
+Flask-Cors==4.0.0
+numpy==1.26.4
+pandas==2.2.1
+yfinance==0.2.37
+scipy==1.12.0

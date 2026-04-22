@@ -2,46 +2,321 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Portfolio</title>
-  <script>
-    if (localStorage.getItem("auth") !== "true") {
-      window.location.href = "login.html";
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MONTRA - Portfolio Analysis</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* --- MASTER STYLES --- */
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background-color: #050505; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        color: #e2e8f0;
     }
-  </script>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+    
+    canvas { 
+        display: block; position: absolute; top: 0; left: 0; z-index: 1;
+    }
+
+    .vignette {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, transparent 20%, #050505 120%);
+        z-index: 5; pointer-events: none;
+    }
+
+    .app-container {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 10; display: flex;
+    }
+
+    /* --- GLASS SIDEBAR --- */
+    .sidebar {
+        width: 260px; background: rgba(10, 12, 16, 0.6);
+        border-right: 1px solid rgba(56, 189, 248, 0.1);
+        backdrop-filter: blur(20px); padding: 40px 0; display: flex; flex-direction: column;
+        box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .sidebar .brand {
+        font-size: 2rem; color: #ffffff; text-align: center; margin-bottom: 50px;
+        letter-spacing: 6px; font-weight: 300; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .nav-item {
+        padding: 18px 30px; color: #64748b; font-size: 0.9rem; letter-spacing: 2px;
+        text-transform: uppercase; cursor: pointer; transition: all 0.3s ease; border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover { background: rgba(56, 189, 248, 0.05); color: #38bdf8; }
+    .nav-item.active {
+        background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-left: 3px solid #38bdf8;
+        box-shadow: inset 20px 0 20px -20px rgba(56, 189, 248, 0.3);
+    }
+
+    /* --- SCROLLING MAIN CONTENT --- */
+    .main-content {
+        flex-grow: 1; overflow-y: auto; padding: 60px 80px;
+        scrollbar-width: thin; scrollbar-color: #38bdf8 transparent;
+    }
+    .main-content::-webkit-scrollbar { width: 6px; }
+    .main-content::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; }
+
+    .page-header { margin-bottom: 40px; }
+    .page-header h1 {
+        font-size: 2.5rem; color: #ffffff; margin: 0 0 10px 0;
+        font-weight: 300; letter-spacing: 4px; text-transform: uppercase;
+    }
+    .page-header p {
+        color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 2px; margin: 0;
+    }
+
+    /* --- TERMINAL PANELS --- */
+    .info-panel {
+        background: rgba(10, 12, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 4px; padding: 35px; margin-bottom: 30px;
+        backdrop-filter: blur(15px); box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .info-panel h3 {
+        color: #38bdf8; font-size: 1rem; margin-top: 0; letter-spacing: 3px; font-weight: 400; text-transform: uppercase;
+        border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 25px;
+    }
+
+    /* --- INPUTS & BUTTONS --- */
+    .input-row { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+    
+    input {
+        background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0; padding: 12px 15px; font-size: 0.95rem; border-radius: 2px;
+        outline: none; font-family: 'Courier New', Courier, monospace; transition: all 0.3s ease;
+    }
+    input:focus { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); background: rgba(15, 23, 42, 0.6); }
+    
+    button {
+        padding: 13px 30px; background: transparent; color: #38bdf8; border: 1px solid #38bdf8; border-radius: 2px;
+        font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; 
+        transition: all 0.3s ease; font-weight: bold;
+    }
+    button:hover { background: rgba(56, 189, 248, 0.15); box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- DATA GRIDS --- */
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .metric-box {
+        background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 20px;
+    }
+    .metric-label { color: #64748b; font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+    .metric-value { font-size: 1.8rem; margin: 0; font-family: 'Courier New', Courier, monospace; }
+
+  </style>
 </head>
 <body>
-  <div class="container">
+
+  <div class="vignette"></div>
+
+  <div class="app-container">
     <aside class="sidebar">
-      <div class="brand">Quant Risk</div>
-      <p onclick="go('dashboard.html')">Dashboard</p>
-      <p onclick="go('portfolio.html')">Portfolio</p>
-      <p onclick="go('settings.html')">Settings</p>
+        <div class="brand">MONTRA</div>
+        <div class="nav-item" onclick="window.location.href='dashboard.html'">Platform Overview</div>
+        <div class="nav-item" onclick="window.location.href='simulation.html'">Stock Simulation</div>
+        <div class="nav-item active">Portfolio Analysis</div>
+        <div class="nav-item" onclick="window.location.href='settings.html'">System Settings</div>
     </aside>
-    <main class="main">
-      <div class="topbar">
-        <div>
-          <h1 class="title">Portfolio</h1>
-          <p class="subtitle">Scenario-weighted portfolio summary</p>
-        </div>
-      </div>
 
-      <div class="panel">
-        <h4>Weights</h4>
-        <div class="form-row">
-          <input class="weight-input" id="w1" type="number" step="0.01" value="0.40" min="0" max="1">
-          <input class="weight-input" id="w2" type="number" step="0.01" value="0.30" min="0" max="1">
-          <input class="weight-input" id="w3" type="number" step="0.01" value="0.30" min="0" max="1">
-          <button class="btn" id="portfolio-calc">Calculate</button>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Weighted Risk Engine</h1>
+            <p>> MODERN PORTFOLIO THEORY (MPT) CORRELATION</p>
         </div>
-      </div>
 
-      <div class="panel">
-        <h4>Portfolio Metrics</h4>
-        <div id="portfolio-metrics" class="metric-grid"></div>
-      </div>
+        <div class="info-panel">
+            <h3>Asset Allocation Vectors</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;">
+                Input target capital and define proportional weights for your assets (Weights must sum to 1.0). The engine calculates combined risk via covariance matrices, revealing your diversification benefit.
+            </p>
+            
+            <div class="input-row">
+                <input id="portCapital" type="number" step="1000" placeholder="Total Capital (₹)" value="100000" style="width: 180px;">
+                <input id="portTickers" type="text" placeholder="Tickers: RELIANCE.NS, TCS.NS, INFY.NS" value="RELIANCE.NS, TCS.NS, INFY.NS" style="width: 320px;">
+                <input id="portWeights" type="text" placeholder="Weights: 0.4, 0.3, 0.3" value="0.4, 0.3, 0.3" style="width: 220px;">
+                <button id="btn-calc-port" onclick="calculatePortfolio()">Calculate Ecosystem</button>
+            </div>
+        </div>
+
+        <div id="portfolio-results" style="display: none;">
+            <div class="info-panel">
+                <h3 id="metrics-title">Ecosystem Output</h3>
+                <div id="metrics" class="metrics-grid"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <div class="info-panel">
+                    <h3>Capital Allocation Map</h3>
+                    <div id="chart-allocation" style="height: 350px; width: 100%;"></div>
+                </div>
+                
+                <div class="info-panel">
+                    <h3>Algorithmic Verdict</h3>
+                    <div id="verdict-container" style="margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
     </main>
   </div>
+
+  <script>
+    // --- 3D ENVIRONMENT SETUP (Shared Engine) ---
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    const geometry = new THREE.PlaneGeometry(100, 100, 60, 60);
+    geometry.rotateX(-Math.PI / 2);
+    const material = new THREE.PointsMaterial({ size: 0.15, color: 0x38bdf8, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+    const plane = new THREE.Points(geometry, material);
+    scene.add(plane);
+
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
+
+    const clock = new THREE.Clock();
+    let mouseX = 0, mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX / window.innerWidth) - 0.5;
+        mouseY = (event.clientY / window.innerHeight) - 0.5;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime() * 0.5;
+        const positions = plane.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] = Math.sin((positions[i] + time) * 0.3) * Math.cos((positions[i + 2] + time) * 0.2) * 1.5;
+        }
+        plane.geometry.attributes.position.needsUpdate = true;
+        camera.position.x += (mouseX * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.02;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- PORTFOLIO LOGIC ---
+    const formatPct = (val) => (val * 100).toFixed(2) + '%';
+    const formatCur = (val) => '₹' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    async function calculatePortfolio() {
+        const capitalStr = document.getElementById('portCapital').value;
+        const capital = capitalStr ? parseFloat(capitalStr) : 100000;
+        
+        let tickersRaw = document.getElementById('portTickers').value || "RELIANCE.NS, TCS.NS, INFY.NS";
+        let weightsRaw = document.getElementById('portWeights').value || "0.4, 0.3, 0.3";
+        
+        let tickers = tickersRaw.split(',').map(t => t.trim());
+        let weights = weightsRaw.split(',').map(w => parseFloat(w.trim()));
+
+        const btn = document.getElementById('btn-calc-port');
+        btn.innerText = "PROCESSING MATRIX..."; btn.disabled = true;
+
+        try {
+            // Validate weights sum to roughly 1.0
+            const weightSum = weights.reduce((a, b) => a + b, 0);
+            if (Math.abs(weightSum - 1.0) > 0.01) {
+                throw new Error("Invalid parameters. Weights must sum exactly to 1.0.");
+            }
+
+            const response = await fetch('http://127.0.0.1:5000/api/portfolio', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: tickers, weights: weights })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            // Compute actual Rupee values based on the backend percentages
+            const expectedReturnAmt = capital * data.portfolio_return;
+            const expectedFinalValue = capital + expectedReturnAmt;
+            const varAmt = capital * Math.abs(data.portfolio_var_95);
+            const cvarAmt = capital * Math.abs(data.portfolio_cvar_95);
+
+            document.getElementById('metrics').innerHTML = `
+                <div class="metric-box"><div class="metric-label">Total Capital</div><div class="metric-value" style="color: #ffffff;">${formatCur(capital)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Portfolio Value</div><div class="metric-value" style="color: #10b981;">${formatCur(expectedFinalValue)}</div></div>
+                <div class="metric-box"><div class="metric-label">Combined Volatility</div><div class="metric-value" style="color: #f59e0b;">${formatPct(data.portfolio_volatility)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Return (%)</div><div class="metric-value" style="color: #10b981;">${formatPct(data.portfolio_return)}</div></div>
+                <div class="metric-box"><div class="metric-label">Value at Risk (95%)</div><div class="metric-value" style="color: #ef4444;">-${formatCur(varAmt)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Shortfall</div><div class="metric-value" style="color: #ef4444;">-${formatCur(cvarAmt)}</div></div>
+            `;
+
+            document.getElementById('portfolio-results').style.display = 'block';
+
+            // --- DONUT ALLOCATION CHART ---
+            const colors = ['#38bdf8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+            const traceDonut = {
+                labels: tickers,
+                values: weights.map(w => w * capital), // Show absolute currency in chart
+                type: 'pie', hole: 0.65,
+                marker: { colors: colors, line: { color: '#050505', width: 2 } },
+                textinfo: 'label+percent', textposition: 'outside',
+                hoverinfo: 'label+value+percent'
+            };
+
+            Plotly.newPlot('chart-allocation', [traceDonut], {
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#94a3b8', family: 'Courier New' },
+                margin: { l: 20, r: 20, t: 20, b: 20 },
+                showlegend: false
+            });
+
+            // --- ALGORITHMIC VERDICT ---
+            const verdictDiv = document.getElementById('verdict-container');
+            let verdictStatus = "";
+            let verdictColor = "";
+            let verdictText = "";
+            
+            // Calculate a basic risk/return ratio (Sharpe-lite)
+            let ratio = data.portfolio_return / data.portfolio_volatility;
+
+            if (ratio > 0.8) {
+                verdictStatus = "OPTIMIZED ALLOCATION"; verdictColor = "#10b981";
+                verdictText = `Strong configuration. The covariance matrix indicates excellent diversification. For every 1% of volatility risk, the portfolio expects to yield ${(ratio).toFixed(2)}% in returns. Expected 1-Year maximum loss limit holds at ${formatCur(varAmt)}.`;
+            } else if (ratio > 0.4) {
+                verdictStatus = "BALANCED, MODERATE RISK"; verdictColor = "#f59e0b";
+                verdictText = `Standard configuration. Returns are proportional to risk exposure (${(ratio).toFixed(2)} ratio). Consider diversifying into inversely correlated assets to lower the Expected Shortfall of ${formatCur(cvarAmt)}.`;
+            } else {
+                verdictStatus = "SUB-OPTIMAL ALLOCATION"; verdictColor = "#ef4444";
+                verdictText = `Warning: High volatility relative to expected return. The selected assets are likely highly correlated (moving in the same direction). In a market downturn, 95% VaR dictates you could lose ${formatCur(varAmt)}. Recalibrate weights.`;
+            }
+
+            verdictDiv.innerHTML = `
+                <div style="background: rgba(0,0,0,0.3); border-left: 4px solid ${verdictColor}; padding: 25px; border-radius: 0 4px 4px 0;">
+                    <h4 style="color: ${verdictColor}; margin-top: 0; font-size: 1.1rem; letter-spacing: 2px; text-transform: uppercase;">
+                        ${verdictStatus}
+                    </h4>
+                    <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin-bottom: 0;">
+                        ${verdictText}
+                    </p>
+                </div>
+            `;
+
+        } catch (error) { 
+            alert("ENGINE ERROR: " + error.message); 
+        } finally { 
+            btn.innerText = "Calculate Ecosystem"; btn.disabled = false; 
+        }
+    }
+  </script>
 </body>
 </html>

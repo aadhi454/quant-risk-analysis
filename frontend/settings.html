@@ -2,37 +2,268 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Settings</title>
-  <script>
-    if (localStorage.getItem("auth") !== "true") {
-      window.location.href = "login.html";
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MONTRA - System Settings</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* --- MASTER STYLES --- */
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background-color: #050505; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        color: #e2e8f0;
     }
-  </script>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+    
+    canvas { 
+        display: block; position: absolute; top: 0; left: 0; z-index: 1;
+    }
+
+    .vignette {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, transparent 20%, #050505 120%);
+        z-index: 5; pointer-events: none;
+    }
+
+    .app-container {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 10; display: flex;
+    }
+
+    /* --- GLASS SIDEBAR --- */
+    .sidebar {
+        width: 260px; background: rgba(10, 12, 16, 0.6);
+        border-right: 1px solid rgba(56, 189, 248, 0.1);
+        backdrop-filter: blur(20px); padding: 40px 0; display: flex; flex-direction: column;
+        box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .sidebar .brand {
+        font-size: 2rem; color: #ffffff; text-align: center; margin-bottom: 50px;
+        letter-spacing: 6px; font-weight: 300; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .nav-item {
+        padding: 18px 30px; color: #64748b; font-size: 0.9rem; letter-spacing: 2px;
+        text-transform: uppercase; cursor: pointer; transition: all 0.3s ease; border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover { background: rgba(56, 189, 248, 0.05); color: #38bdf8; }
+    .nav-item.active {
+        background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-left: 3px solid #38bdf8;
+        box-shadow: inset 20px 0 20px -20px rgba(56, 189, 248, 0.3);
+    }
+
+    /* --- SCROLLING MAIN CONTENT --- */
+    .main-content {
+        flex-grow: 1; overflow-y: auto; padding: 60px 80px;
+        scrollbar-width: thin; scrollbar-color: #38bdf8 transparent;
+    }
+    .main-content::-webkit-scrollbar { width: 6px; }
+    .main-content::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; }
+
+    .page-header { margin-bottom: 40px; }
+    .page-header h1 {
+        font-size: 2.5rem; color: #ffffff; margin: 0 0 10px 0;
+        font-weight: 300; letter-spacing: 4px; text-transform: uppercase;
+    }
+    .page-header p {
+        color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 2px; margin: 0;
+    }
+
+    /* --- TERMINAL PANELS --- */
+    .info-panel {
+        background: rgba(10, 12, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 4px; padding: 35px; margin-bottom: 30px;
+        backdrop-filter: blur(15px); box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .info-panel h3 {
+        color: #38bdf8; font-size: 1rem; margin-top: 0; letter-spacing: 3px; font-weight: 400; text-transform: uppercase;
+        border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 25px;
+    }
+
+    /* --- SETTINGS LAYOUT --- */
+    .setting-row {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }
+    .setting-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .setting-label {
+        display: flex; flex-direction: column; gap: 5px;
+    }
+    .setting-title { color: #e2e8f0; font-size: 1.1rem; letter-spacing: 1px; }
+    .setting-desc { color: #64748b; font-size: 0.85rem; font-family: 'Courier New', Courier, monospace; }
+
+    input[type="text"], input[type="number"] {
+        background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0; padding: 12px 15px; font-size: 0.95rem; border-radius: 2px;
+        outline: none; font-family: 'Courier New', Courier, monospace; transition: all 0.3s ease;
+        width: 250px; text-align: right;
+    }
+    input:focus { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+    input:disabled { color: #64748b; cursor: not-allowed; border-color: rgba(255,255,255,0.02); }
+    
+    button {
+        padding: 13px 30px; background: transparent; color: #38bdf8; border: 1px solid #38bdf8; border-radius: 2px;
+        font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; 
+        transition: all 0.3s ease; font-weight: bold;
+    }
+    button:hover { background: rgba(56, 189, 248, 0.15); box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); color: #fff; }
+    
+    .btn-danger { color: #ef4444; border-color: #ef4444; }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.15); box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+
+    .status-badge {
+        display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem;
+        letter-spacing: 1px; text-transform: uppercase; font-family: 'Courier New', Courier, monospace;
+        background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981;
+    }
+
+  </style>
 </head>
 <body>
-  <div class="container">
-    <aside class="sidebar">
-      <div class="brand">Quant Risk</div>
-      <p onclick="go('dashboard.html')">Dashboard</p>
-      <p onclick="go('portfolio.html')">Portfolio</p>
-      <p onclick="go('settings.html')">Settings</p>
-    </aside>
-    <main class="main">
-      <div class="topbar">
-        <div>
-          <h1 class="title">Settings</h1>
-          <p class="subtitle">Session controls</p>
-        </div>
-      </div>
 
-      <div class="panel">
-        <h4>Account</h4>
-        <p>Logged in as <strong>admin@quant.com</strong></p>
-        <button class="btn secondary" onclick="logout()">Logout</button>
-      </div>
+  <div class="vignette"></div>
+
+  <div class="app-container">
+    <aside class="sidebar">
+        <div class="brand">MONTRA</div>
+        <div class="nav-item" onclick="window.location.href='dashboard.html'">Platform Overview</div>
+        <div class="nav-item" onclick="window.location.href='simulation.html'">Stock Simulation</div>
+        <div class="nav-item" onclick="window.location.href='portfolio.html'">Portfolio Analysis</div>
+        <div class="nav-item active">System Settings</div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>System Configuration</h1>
+            <p>> ENGINE PREFERENCES & DATA LINKS</p>
+        </div>
+
+        <div class="info-panel">
+            <h3>Terminal Status</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-title">Secure Connection</span>
+                    <span class="setting-desc">Status of the local Python architecture.</span>
+                </div>
+                <div class="status-badge">● ONLINE & ENCRYPTED</div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-title">Active Analyst ID</span>
+                    <span class="setting-desc">Current session authentication token.</span>
+                </div>
+                <span style="font-family: 'Courier New'; color: #38bdf8;">AUTH_0x8F92A</span>
+            </div>
+            <div class="setting-row" style="margin-top: 15px;">
+                <button class="btn-danger" onclick="window.location.href='index.html'" style="width: 100%;">Terminate Session</button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3>Data Feeds & Engine Limits</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-title">Market Data Provider</span>
+                    <span class="setting-desc">Primary pipeline for historical ticker prices.</span>
+                </div>
+                <input type="text" value="yfinance API (Real-Time)" disabled>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-title">Default Simulation Days</span>
+                    <span class="setting-desc">Standard trading year representation.</span>
+                </div>
+                <input type="number" id="defDays" value="252">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-title">Hardware Acceleration</span>
+                    <span class="setting-desc">Allows Plotly to render paths via WebGL GPU.</span>
+                </div>
+                <input type="text" value="ENABLED (scattergl)" disabled style="color: #10b981;">
+            </div>
+        </div>
+
+        <div style="text-align: right;">
+            <button id="btn-save" onclick="saveSettings()">Flash Parameters to Core</button>
+        </div>
+
     </main>
   </div>
+
+  <script>
+    // --- 3D ENVIRONMENT SETUP (Shared Engine) ---
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    const geometry = new THREE.PlaneGeometry(100, 100, 60, 60);
+    geometry.rotateX(-Math.PI / 2);
+    const material = new THREE.PointsMaterial({ size: 0.15, color: 0x38bdf8, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+    const plane = new THREE.Points(geometry, material);
+    scene.add(plane);
+
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
+
+    const clock = new THREE.Clock();
+    let mouseX = 0, mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX / window.innerWidth) - 0.5;
+        mouseY = (event.clientY / window.innerHeight) - 0.5;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime() * 0.5;
+        const positions = plane.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] = Math.sin((positions[i] + time) * 0.3) * Math.cos((positions[i + 2] + time) * 0.2) * 1.5;
+        }
+        plane.geometry.attributes.position.needsUpdate = true;
+        camera.position.x += (mouseX * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.02;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- SETTINGS UI LOGIC ---
+    function saveSettings() {
+        const btn = document.getElementById('btn-save');
+        btn.innerText = "FLASHING MEMORY...";
+        btn.disabled = true;
+        
+        // Simulate a brief writing delay for realism
+        setTimeout(() => {
+            btn.style.color = "#10b981";
+            btn.style.borderColor = "#10b981";
+            btn.innerText = "PARAMETERS SECURED";
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                btn.style.color = "#38bdf8";
+                btn.style.borderColor = "#38bdf8";
+                btn.innerText = "Flash Parameters to Core";
+                btn.disabled = false;
+            }, 2000);
+        }, 800);
+    }
+  </script>
 </body>
 </html>

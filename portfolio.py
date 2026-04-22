@@ -1,76 +1,66 @@
-from __future__ import annotations
-
 import numpy as np
+import pandas as pd
+import yfinance as yf
 
-
-def calculate_portfolio_return(weights: np.ndarray, returns_list: list[float]) -> float:
-    """Calculate the weighted average of individual mean returns."""
-    weights_array = np.asarray(weights, dtype=float)
-    returns_array = np.asarray(returns_list, dtype=float)
-
-    if weights_array.ndim != 1:
-        raise ValueError("Weights must be a one-dimensional array.")
-    if returns_array.ndim != 1:
-        raise ValueError("Returns list must be one-dimensional.")
-    if len(weights_array) != len(returns_array):
-        raise ValueError("Weights and returns_list must have the same length.")
-
-    return float(weights_array @ returns_array)
-
-
-def calculate_portfolio_volatility(weights: np.ndarray, returns_matrix: np.ndarray) -> float:
-    """Calculate portfolio volatility from the covariance matrix."""
-    weights_array = np.asarray(weights, dtype=float)
-    returns_matrix = np.asarray(returns_matrix, dtype=float)
-
-    if weights_array.ndim != 1:
-        raise ValueError("Weights must be a one-dimensional array.")
-    if returns_matrix.ndim != 2:
-        raise ValueError("Returns matrix must be two-dimensional.")
-    if returns_matrix.shape[0] != len(weights_array):
-        raise ValueError("Weights must match the number of rows in returns_matrix.")
-
-    cov_matrix = np.cov(returns_matrix)
-    if np.ndim(cov_matrix) == 0:
-        cov_matrix = np.array([[float(cov_matrix)]], dtype=float)
-    portfolio_variance = weights_array.T @ cov_matrix @ weights_array
-    return float(np.sqrt(portfolio_variance))
-
-
-def calculate_portfolio_var_es(simulated_portfolio_returns: np.ndarray) -> tuple[float, float]:
+def calculate_portfolio_metrics(tickers, weights, confidence_level=0.95):
     """
-    Calculate portfolio VaR and Expected Shortfall at the 95% confidence level.
-
-    Returns values as positive loss fractions.
+    Calculates expected return, volatility, VaR, and expected shortfall 
+    for a weighted portfolio of stocks using historical covariance.
     """
-    portfolio_returns = np.asarray(simulated_portfolio_returns, dtype=float).ravel()
-    if portfolio_returns.size == 0:
-        raise ValueError("Simulated portfolio returns are empty.")
-
-    losses = np.maximum(0.0, -portfolio_returns)
-    var_level = float(np.percentile(losses, 95))
-    tail_losses = losses[losses >= var_level]
-    expected_shortfall = float(tail_losses.mean()) if tail_losses.size else var_level
-    return var_level, expected_shortfall
-
-
-def monte_carlo_portfolio(simulations_list: list[np.ndarray], weights: np.ndarray) -> np.ndarray:
-    """
-    Combine individual simulated price paths into a weighted portfolio simulation.
-
-    Each element of simulations_list must have the same shape:
-    (days + 1, number_of_simulations).
-    """
-    weights_array = np.asarray(weights, dtype=float)
-    if weights_array.ndim != 1:
-        raise ValueError("Weights must be a one-dimensional array.")
-    if not simulations_list:
-        raise ValueError("Simulations list is empty.")
-    if len(simulations_list) != len(weights_array):
-        raise ValueError("Weights and simulations_list must have the same length.")
-
-    simulations_array = np.asarray(simulations_list, dtype=float)
-    if simulations_array.ndim != 3:
-        raise ValueError("Each simulation must be a two-dimensional array.")
-
-    return np.tensordot(weights_array, simulations_array, axes=(0, 0))
+    if len(tickers) != len(weights):
+        return {"error": "Number of tickers and weights must match."}
+        
+    if not np.isclose(sum(weights), 1.0):
+        return {"error": "Portfolio weights must sum to 1.0."}
+        
+    weights = np.array(weights)
+    
+    # Fetch historical data and calculate daily log returns for all tickers
+    returns_dict = {}
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1y")
+            if not hist.empty:
+                hist['Log_Return'] = np.log(hist['Close'] / hist['Close'].shift(1))
+                returns_dict[ticker] = hist['Log_Return'].dropna()
+        except Exception as e:
+            print(f"Error fetching {ticker}: {e}")
+            return {"error": f"Failed to fetch data for {ticker}"}
+            
+    # Combine into a single DataFrame to align dates perfectly
+    portfolio_df = pd.DataFrame(returns_dict).dropna()
+    
+    if portfolio_df.empty:
+        return {"error": "No overlapping historical data found for the portfolio."}
+        
+    # Calculate mean daily returns and the covariance matrix
+    mean_daily_returns = portfolio_df.mean()
+    cov_matrix = portfolio_df.cov()
+    
+    # Calculate portfolio daily return and variance (matrix multiplication)
+    portfolio_daily_return = np.dot(weights, mean_daily_returns)
+    portfolio_daily_variance = np.dot(weights.T, np.dot(cov_matrix, weights))
+    portfolio_daily_volatility = np.sqrt(portfolio_daily_variance)
+    
+    # Annualize the return and volatility
+    portfolio_annual_return = portfolio_daily_return * 252
+    portfolio_annual_volatility = portfolio_daily_volatility * np.sqrt(252)
+    
+    # Calculate historical daily portfolio returns for VaR/CVaR
+    portfolio_historical_returns = portfolio_df.dot(weights)
+    
+    # Calculate VaR and Expected Shortfall
+    alpha = 1.0 - confidence_level
+    var = np.percentile(portfolio_historical_returns, alpha * 100)
+    
+    worse_returns = portfolio_historical_returns[portfolio_historical_returns <= var]
+    expected_shortfall = np.mean(worse_returns) if len(worse_returns) > 0 else var
+    
+    return {
+        "status": "Valid",
+        "portfolio_return": portfolio_annual_return,
+        "portfolio_volatility": portfolio_annual_volatility,
+        "portfolio_var_95": var,
+        "portfolio_cvar_95": expected_shortfall
+    }

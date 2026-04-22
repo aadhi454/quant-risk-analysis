@@ -2,48 +2,313 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard</title>
-  <script>
-    if (localStorage.getItem("auth") !== "true") {
-      window.location.href = "login.html";
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MONTRA - Platform Overview</title>
+  <style>
+    /* --- MASTER STYLES --- */
+    body { 
+        margin: 0; 
+        overflow: hidden; /* We handle scrolling inside the main container */
+        background-color: #050505; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        color: #e2e8f0;
     }
-  </script>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <script src="app.js" defer></script>
+    
+    canvas { 
+        display: block; 
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+    }
+
+    .vignette {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, transparent 20%, #050505 120%);
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* --- LAYOUT STRUCTURE --- */
+    .app-container {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100vh;
+        z-index: 10;
+        display: flex;
+    }
+
+    /* --- GLASS SIDEBAR --- */
+    .sidebar {
+        width: 260px;
+        background: rgba(10, 12, 16, 0.6);
+        border-right: 1px solid rgba(56, 189, 248, 0.1);
+        backdrop-filter: blur(20px);
+        padding: 40px 0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .sidebar .brand {
+        font-size: 2rem;
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 50px;
+        letter-spacing: 6px;
+        font-weight: 300;
+        text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .nav-item {
+        padding: 18px 30px;
+        color: #64748b;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover {
+        background: rgba(56, 189, 248, 0.05);
+        color: #38bdf8;
+    }
+
+    .nav-item.active {
+        background: rgba(56, 189, 248, 0.1);
+        color: #38bdf8;
+        border-left: 3px solid #38bdf8;
+        box-shadow: inset 20px 0 20px -20px rgba(56, 189, 248, 0.3);
+    }
+
+    /* --- SCROLLING MAIN CONTENT --- */
+    .main-content {
+        flex-grow: 1;
+        overflow-y: auto; /* Allows the content to scroll while the 3D background stays still */
+        padding: 60px 80px;
+        scrollbar-width: thin;
+        scrollbar-color: #38bdf8 transparent;
+    }
+
+    .main-content::-webkit-scrollbar { width: 6px; }
+    .main-content::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; }
+
+    .page-header {
+        margin-bottom: 60px;
+    }
+
+    .page-header h1 {
+        font-size: 2.5rem;
+        color: #ffffff;
+        margin: 0 0 10px 0;
+        font-weight: 300;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+    }
+
+    .page-header p {
+        color: #38bdf8;
+        font-family: 'Courier New', Courier, monospace;
+        letter-spacing: 2px;
+        margin: 0;
+    }
+
+    /* --- INFO PANELS --- */
+    .info-panel {
+        background: rgba(10, 12, 16, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 40px;
+        margin-bottom: 40px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .info-panel:hover {
+        border-color: rgba(56, 189, 248, 0.3);
+        transform: translateY(-2px);
+    }
+
+    .info-panel h2 {
+        color: #f8fafc;
+        font-size: 1.5rem;
+        margin-top: 0;
+        margin-bottom: 20px;
+        letter-spacing: 3px;
+        font-weight: 400;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 15px;
+        text-transform: uppercase;
+    }
+
+    .info-panel h2 span { color: #38bdf8; }
+
+    .info-panel p {
+        color: #94a3b8;
+        line-height: 1.8;
+        font-size: 1rem;
+        margin-bottom: 20px;
+    }
+
+    .highlight-box {
+        background: rgba(56, 189, 248, 0.05);
+        border-left: 4px solid #38bdf8;
+        padding: 20px;
+        margin: 20px 0;
+        font-family: 'Courier New', Courier, monospace;
+        color: #e2e8f0;
+    }
+
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+    }
+
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-  <div class="container">
+
+  <div class="vignette"></div>
+
+  <div class="app-container">
     <aside class="sidebar">
-      <div class="brand">Quant Risk</div>
-      <p onclick="go('dashboard.html')">Dashboard</p>
-      <p onclick="go('portfolio.html')">Portfolio</p>
-      <p onclick="go('settings.html')">Settings</p>
+        <div class="brand">MONTRA</div>
+        <div class="nav-item active">Platform Overview</div>
+        <div class="nav-item" onclick="window.location.href='simulation.html'">Stock Simulation</div>
+        <div class="nav-item" onclick="window.location.href='portfolio.html'">Portfolio Analysis</div>
+        <div class="nav-item" onclick="window.location.href='settings.html'">System Settings</div>
     </aside>
-    <main class="main">
-      <div class="topbar">
-        <div>
-          <h1 class="title">Dashboard</h1>
-          <p class="subtitle">Live simulation overview</p>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Terminal Overview</h1>
+            <p>> STATUS: CONNECTED | ENGINE: ONLINE</p>
         </div>
-        <span class="status-chip" id="backend-status">Backend: Loading...</span>
-      </div>
 
-      <div class="panel">
-        <h4>Metrics</h4>
-        <div id="metrics" class="metric-grid"></div>
-      </div>
+        <div class="info-panel">
+            <h2>01. <span>The Retail Trap</span></h2>
+            <div class="grid-2">
+                <div>
+                    <p>The modern stock market is a highly volatile environment dominated by institutional algorithms, high-frequency trading, and massive liquidity pools. Retail traders often enter this arena armed with nothing but "gut feelings," technical analysis charts that lag behind real-time data, and social media sentiment.</p>
+                    <p>This approach inevitably leads to emotional trading. When a stock dips, panic selling occurs. When a stock surges, FOMO (Fear Of Missing Out) drives irrational buying. The result is a consistent transfer of wealth from retail investors to institutional quantitative funds.</p>
+                </div>
+                <div>
+                    <div class="highlight-box">
+                        <strong>MARKET REALITY:</strong><br><br>
+                        "You cannot predict the future of a chaotic system. Trying to guess tomorrow's exact price based on yesterday's chart is a mathematical fallacy."
+                    </div>
+                </div>
+            </div>
+        </div>
 
-      <div class="panel">
-        <h4>Price Chart</h4>
-        <div id="chart" class="chart-box"></div>
-      </div>
+        <div class="info-panel">
+            <h2>02. <span>The MONTRA Methodology</span></h2>
+            <p>MONTRA (Monte Carlo Trading & Risk Analysis) eliminates human emotion by applying the exact mathematical frameworks used by Wall Street quants. We do not attempt to predict a single future. Instead, we simulate thousands of possible futures to calculate the exact probability of loss.</p>
+            
+            <p>Our engine is built on two core pillars of quantitative finance:</p>
+            
+            <div class="grid-2" style="margin-top: 30px;">
+                <div style="background: rgba(0,0,0,0.3); padding: 25px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h3 style="color: #38bdf8; margin-top: 0; font-weight: 400; letter-spacing: 2px;">I. Geometric Brownian Motion</h3>
+                    <p style="font-size: 0.9rem;">GBM is the standard model for asset pricing. It assumes that stock returns are a combination of a predictable drift (mean return) and a totally unpredictable shock (volatility). This isolates the stock's underlying "DNA" from market noise.</p>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 25px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h3 style="color: #10b981; margin-top: 0; font-weight: 400; letter-spacing: 2px;">II. Monte Carlo Simulation</h3>
+                    <p style="font-size: 0.9rem;">Once we map the GBM parameters, we use randomized pathways to simulate a stock's behavior 1,000 to 5,000 times over a set period. By analyzing all possible outcomes, we define the extreme risk boundaries.</p>
+                </div>
+            </div>
+        </div>
 
-      <div class="panel">
-        <h4>Risk Distribution</h4>
-        <div id="dist" class="chart-box"></div>
-      </div>
+        <div class="info-panel">
+            <h2>03. <span>Defining Quantifiable Risk</span></h2>
+            <p>Running thousands of simulations is useless without actionable intelligence. MONTRA distills millions of data points into two critical, institutional-grade metrics:</p>
+            
+            <div class="highlight-box" style="border-color: #ef4444; background: rgba(239, 68, 68, 0.05);">
+                <strong style="color: #ef4444;">VALUE AT RISK (VaR 95%)</strong><br>
+                VaR answers one simple question: "What is the most I can expect to lose in 95% of normal market conditions?" If your 1-year VaR is -5%, you can be 95% confident your portfolio won't drop below that line.
+            </div>
+
+            <div class="highlight-box" style="border-color: #f59e0b; background: rgba(245, 158, 11, 0.05);">
+                <strong style="color: #f59e0b;">EXPECTED SHORTFALL (CVaR)</strong><br>
+                Also known as Conditional Value at Risk. This answers the terrifying question: "If the market crashes and we breach the 95% safety net, exactly how bad will the remaining 5% worst-case scenarios be?"
+            </div>
+        </div>
+
     </main>
   </div>
+
+  <script>
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Inject the canvas at the back
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    const gridSize = 100;
+    const segments = 60;
+    const geometry = new THREE.PlaneGeometry(gridSize, gridSize, segments, segments);
+    geometry.rotateX(-Math.PI / 2);
+
+    const material = new THREE.PointsMaterial({ 
+        size: 0.15, 
+        color: 0x38bdf8, 
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending
+    });
+    
+    const plane = new THREE.Points(geometry, material);
+    scene.add(plane);
+
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
+
+    const clock = new THREE.Clock();
+    let mouseX = 0;
+    let mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX / window.innerWidth) - 0.5;
+        mouseY = (event.clientY / window.innerHeight) - 0.5;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime() * 0.5;
+        
+        const positions = plane.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            const x = positions[i];
+            const z = positions[i + 2];
+            positions[i + 1] = Math.sin((x + time) * 0.3) * Math.cos((z + time) * 0.2) * 1.5;
+        }
+        plane.geometry.attributes.position.needsUpdate = true;
+        
+        camera.position.x += (mouseX * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.02;
+        camera.lookAt(0, 0, 0);
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>

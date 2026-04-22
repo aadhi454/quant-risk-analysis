@@ -2,28 +2,266 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Login</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MONTRA - Secure Authentication</title>
+  <style>
+    /* --- MASTER STYLES --- */
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background-color: #050505; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    }
+    
+    canvas { 
+        display: block; 
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+    }
+
+    /* --- BACKGROUND VIGNETTE --- */
+    .vignette {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, transparent 30%, #050505 110%);
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* --- AUTHENTICATION MODULE --- */
+    .auth-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10;
+        width: 420px;
+        background: rgba(10, 12, 16, 0.7);
+        padding: 50px 60px;
+        border: 1px solid rgba(56, 189, 248, 0.15);
+        border-radius: 4px;
+        backdrop-filter: blur(25px);
+        box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 0 20px rgba(56, 189, 248, 0.05);
+        box-sizing: border-box;
+    }
+
+    .system-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 30px;
+        justify-content: flex-start;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #10b981;
+        animation: pulse 2s infinite;
+    }
+
+    .status-text {
+        color: #10b981;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.75rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.4; }
+        100% { opacity: 1; }
+    }
+
+    h2 {
+        color: #ffffff;
+        font-size: 2rem;
+        margin: 0 0 5px 0;
+        letter-spacing: 6px;
+        font-weight: 300;
+        text-transform: uppercase;
+    }
+
+    .subtitle {
+        color: #64748b;
+        font-size: 0.8rem;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 40px;
+    }
+
+    /* --- INPUT FIELDS --- */
+    .input-group {
+        margin-bottom: 25px;
+        text-align: left;
+    }
+
+    .input-group label {
+        display: block;
+        color: #94a3b8;
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .input-group input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        padding: 15px;
+        font-size: 1rem;
+        border-radius: 2px;
+        outline: none;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+        font-family: 'Courier New', Courier, monospace;
+    }
+
+    .input-group input:focus {
+        border-color: #38bdf8;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+        background: rgba(15, 23, 42, 0.6);
+    }
+
+    /* --- AUTH BUTTON --- */
+    button {
+        width: 100%;
+        margin-top: 20px;
+        padding: 16px;
+        background: transparent;
+        color: #38bdf8;
+        border: 1px solid #38bdf8;
+        border-radius: 2px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    button:hover {
+        background: rgba(56, 189, 248, 0.15);
+        box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+        color: #ffffff;
+    }
+
+    button:active {
+        transform: scale(0.98);
+    }
+
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-  <div class="hero">
-    <div class="login-box">
-      <h2>Login</h2>
-      <input id="email" type="email" placeholder="Email">
-      <input id="pass" type="password" placeholder="Password">
-      <button class="btn" onclick="login()">Enter</button>
+
+  <div class="vignette"></div>
+
+  <div class="auth-container">
+    <div class="system-status">
+        <div class="status-dot"></div>
+        <div class="status-text">Server Secure / Encrypted</div>
     </div>
+    
+    <h2>IDENTIFY</h2>
+    <div class="subtitle">Quant Engine Authentication</div>
+    
+    <div class="input-group">
+        <label>Analyst ID</label>
+        <input type="text" placeholder="Enter ID..." id="username" autocomplete="off">
+    </div>
+
+    <div class="input-group">
+        <label>Passcode</label>
+        <input type="password" placeholder="••••••••" id="password">
+    </div>
+
+    <button onclick="authenticate()">Establish Connection</button>
   </div>
+
   <script>
-    function login() {
-      const email = document.getElementById("email").value;
-      const pass = document.getElementById("pass").value;
-      if (email === "admin@quant.com" && pass === "1234") {
-        localStorage.setItem("auth", "true");
-        window.location.href = "dashboard.html";
-      } else {
-        alert("Invalid login");
-      }
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const gridSize = 100;
+    const segments = 60;
+    const geometry = new THREE.PlaneGeometry(gridSize, gridSize, segments, segments);
+    geometry.rotateX(-Math.PI / 2);
+
+    const material = new THREE.PointsMaterial({ 
+        size: 0.15, 
+        color: 0x38bdf8, 
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending
+    });
+    
+    const plane = new THREE.Points(geometry, material);
+    scene.add(plane);
+
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
+
+    const clock = new THREE.Clock();
+    let mouseX = 0;
+    let mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX / window.innerWidth) - 0.5;
+        mouseY = (event.clientY / window.innerHeight) - 0.5;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime() * 0.5;
+        
+        const positions = plane.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            const x = positions[i];
+            const z = positions[i + 2];
+            positions[i + 1] = Math.sin((x + time) * 0.3) * Math.cos((z + time) * 0.2) * 1.5;
+        }
+        plane.geometry.attributes.position.needsUpdate = true;
+        
+        camera.position.x += (mouseX * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.02;
+        camera.lookAt(0, 0, 0);
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- AUTHENTICATION LOGIC ---
+    function authenticate() {
+        const btn = document.querySelector('button');
+        btn.innerText = "VERIFYING...";
+        btn.style.color = "#10b981";
+        btn.style.borderColor = "#10b981";
+        
+        // Simulating a brief connection delay for realism
+        setTimeout(() => {
+            window.location.href = 'dashboard.html';
+        }, 800);
     }
   </script>
 </body>

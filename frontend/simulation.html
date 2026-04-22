@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MONTRA - Stock Simulation</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* --- MASTER STYLES --- */
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background-color: #050505; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        color: #e2e8f0;
+    }
+    
+    canvas { 
+        display: block; 
+        position: absolute;
+        top: 0; left: 0; z-index: 1;
+    }
+
+    .vignette {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, transparent 20%, #050505 120%);
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    .app-container {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 10;
+        display: flex;
+    }
+
+    /* --- GLASS SIDEBAR --- */
+    .sidebar {
+        width: 260px;
+        background: rgba(10, 12, 16, 0.6);
+        border-right: 1px solid rgba(56, 189, 248, 0.1);
+        backdrop-filter: blur(20px);
+        padding: 40px 0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .sidebar .brand {
+        font-size: 2rem;
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 50px;
+        letter-spacing: 6px;
+        font-weight: 300;
+        text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .nav-item {
+        padding: 18px 30px;
+        color: #64748b;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover { background: rgba(56, 189, 248, 0.05); color: #38bdf8; }
+    .nav-item.active {
+        background: rgba(56, 189, 248, 0.1); color: #38bdf8;
+        border-left: 3px solid #38bdf8;
+        box-shadow: inset 20px 0 20px -20px rgba(56, 189, 248, 0.3);
+    }
+
+    /* --- SCROLLING MAIN CONTENT --- */
+    .main-content {
+        flex-grow: 1;
+        overflow-y: auto; 
+        padding: 60px 80px;
+        scrollbar-width: thin;
+        scrollbar-color: #38bdf8 transparent;
+    }
+
+    .main-content::-webkit-scrollbar { width: 6px; }
+    .main-content::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; }
+
+    .page-header { margin-bottom: 40px; }
+    .page-header h1 {
+        font-size: 2.5rem; color: #ffffff; margin: 0 0 10px 0;
+        font-weight: 300; letter-spacing: 4px; text-transform: uppercase;
+    }
+    .page-header p {
+        color: #38bdf8; font-family: 'Courier New', Courier, monospace;
+        letter-spacing: 2px; margin: 0;
+    }
+
+    /* --- TERMINAL PANELS --- */
+    .info-panel {
+        background: rgba(10, 12, 16, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 35px;
+        margin-bottom: 30px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .info-panel h3 {
+        color: #38bdf8; font-size: 1rem; margin-top: 0;
+        letter-spacing: 3px; font-weight: 400; text-transform: uppercase;
+        border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 25px;
+    }
+
+    /* --- INPUTS & BUTTONS --- */
+    .input-row { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+    
+    input {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0; padding: 12px 15px; font-size: 0.95rem;
+        border-radius: 2px; outline: none; font-family: 'Courier New', Courier, monospace;
+        transition: all 0.3s ease;
+    }
+    input:focus { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); background: rgba(15, 23, 42, 0.6); }
+    
+    button {
+        padding: 13px 30px; background: transparent; color: #38bdf8;
+        border: 1px solid #38bdf8; border-radius: 2px; font-size: 0.85rem;
+        letter-spacing: 2px; text-transform: uppercase; cursor: pointer; 
+        transition: all 0.3s ease; font-weight: bold;
+    }
+    button:hover { background: rgba(56, 189, 248, 0.15); box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- DATA GRIDS --- */
+    .metrics-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .metric-box {
+        background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 4px; padding: 20px;
+    }
+    .metric-label { color: #64748b; font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+    .metric-value { font-size: 2rem; margin: 0; font-family: 'Courier New', Courier, monospace; }
+
+  </style>
+</head>
+<body>
+
+  <div class="vignette"></div>
+
+  <div class="app-container">
+    <aside class="sidebar">
+        <div class="brand">MONTRA</div>
+        <div class="nav-item" onclick="window.location.href='dashboard.html'">Platform Overview</div>
+        <div class="nav-item active">Stock Simulation</div>
+        <div class="nav-item" onclick="window.location.href='portfolio.html'">Portfolio Analysis</div>
+        <div class="nav-item" onclick="window.location.href='settings.html'">System Settings</div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Engine Parameters</h1>
+            <p>> EXECUTE CUSTOM PROJECTIONS</p>
+        </div>
+
+        <div class="info-panel">
+            <h3>Single Asset Targeting</h3>
+            <div class="input-row">
+                <input id="singleStock" type="text" placeholder="Ticker (e.g. SBIN.NS)" style="width: 200px;">
+                <input id="singlePrice" type="number" step="0.01" placeholder="Invested Amt (₹)" style="width: 180px;">
+                <input id="singleDays" type="number" placeholder="Days (e.g. 252)" style="width: 150px;">
+                <input id="singleCount" type="number" placeholder="Sims (e.g. 5000)" style="width: 160px;">
+                <button id="btn-run-single" onclick="runSingle()">Initialize Sequence</button>
+            </div>
+
+            <h3 style="margin-top: 40px;">Multi-Asset Comparison (Apples-to-Apples)</h3>
+            <div class="input-row">
+                <input id="multiStock" type="text" placeholder="Tickers: RELIANCE.NS, TCS.NS" style="width: 280px;">
+                <input id="multiPrice" type="number" step="0.01" placeholder="Invested Amt (₹)" style="width: 180px;">
+                <input id="multiDays" type="number" placeholder="Days (e.g. 252)" style="width: 150px;">
+                <input id="multiCount" type="number" placeholder="Sims (e.g. 5000)" style="width: 160px;">
+                <button id="btn-run-multi" onclick="runMulti()">Run Comparison</button>
+            </div>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="info-panel" id="metrics-panel">
+                <h3 id="metrics-title">Simulation Output</h3>
+                <div id="metrics" class="metrics-grid"></div>
+            </div>
+
+            <div class="info-panel">
+                <h3 id="chart-section-title">Visual Analytics</h3>
+                <div id="chart" style="height: 450px; width: 100%;"></div>
+                
+                <div id="verdict-container" style="display: none; margin-top: 30px;"></div>
+            </div>
+        </div>
+    </main>
+  </div>
+
+
+
+  <script>
+    // --- 3D ENVIRONMENT SETUP ---
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x050505, 0.02);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    const geometry = new THREE.PlaneGeometry(100, 100, 60, 60);
+    geometry.rotateX(-Math.PI / 2);
+    const material = new THREE.PointsMaterial({ size: 0.15, color: 0x38bdf8, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+    const plane = new THREE.Points(geometry, material);
+    scene.add(plane);
+
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
+
+    const clock = new THREE.Clock();
+    let mouseX = 0, mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX / window.innerWidth) - 0.5;
+        mouseY = (event.clientY / window.innerHeight) - 0.5;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime() * 0.5;
+        const positions = plane.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] = Math.sin((positions[i] + time) * 0.3) * Math.cos((positions[i + 2] + time) * 0.2) * 1.5;
+        }
+        plane.geometry.attributes.position.needsUpdate = true;
+        camera.position.x += (mouseX * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 + 5 - camera.position.y) * 0.02;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- SIMULATION LOGIC ---
+    const formatPct = (val) => (val * 100).toFixed(2) + '%';
+    const formatCur = (val) => '₹' + val.toFixed(2);
+
+    async function runSingle() {
+        let ticker = document.getElementById('singleStock').value.trim() || "SBIN.NS";
+        let price = document.getElementById('singlePrice').value;
+        let days = document.getElementById('singleDays').value;
+        let sims = document.getElementById('singleCount').value;
+
+        const btn = document.getElementById('btn-run-single');
+        btn.innerText = "CALCULATING..."; btn.disabled = true;
+        document.getElementById('verdict-container').style.display = 'none';
+
+        const payload = {
+            ticker: ticker,
+            price: price ? parseFloat(price) : null,
+            days: days ? parseInt(days) : 252,
+            sims: sims ? parseInt(sims) : 1000
+        };
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/simulate', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            document.getElementById('metrics-title').innerText = `Target: ${ticker} | Output: ${payload.days} Days / ${payload.sims} Paths`;
+            
+            document.getElementById('metrics').innerHTML = `
+                <div class="metric-box"><div class="metric-label">Invested Capital</div><div class="metric-value" style="color: #ffffff;">${formatCur(data.current_price)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Final Value</div><div class="metric-value" style="color: #ffffff;">${formatCur(data.simulation.expected_final_price)}</div></div>
+                <div class="metric-box"><div class="metric-label">Annual Volatility</div><div class="metric-value" style="color: #f59e0b;">${formatPct(data.metrics.annual_volatility)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Return</div><div class="metric-value" style="color: #10b981;">${formatPct(data.metrics.annual_return)}</div></div>
+                <div class="metric-box"><div class="metric-label">Value at Risk (95%)</div><div class="metric-value" style="color: #ef4444;">${formatPct(data.metrics.var_95)}</div></div>
+                <div class="metric-box"><div class="metric-label">Expected Shortfall</div><div class="metric-value" style="color: #ef4444;">${formatPct(data.metrics.expected_shortfall_95)}</div></div>
+            `;
+
+            document.getElementById('results').style.display = 'block';
+
+            const traces = data.simulation.chart_paths.map((path) => ({
+                y: path, type: 'scattergl', mode: 'lines',
+                line: { width: 1, color: 'rgba(56, 189, 248, 0.15)' }, showlegend: false, hoverinfo: 'none'
+            }));
+
+            document.getElementById('chart-section-title').innerText = "Monte Carlo Path Matrix";
+            Plotly.newPlot('chart', traces, {
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#94a3b8', family: 'Courier New' },
+                xaxis: { title: 'Trading Days', gridcolor: 'rgba(255,255,255,0.05)', zeroline: false },
+                yaxis: { title: 'Asset Value (₹)', gridcolor: 'rgba(255,255,255,0.05)', zeroline: false },
+                margin: { l: 60, r: 20, t: 20, b: 40 }
+            });
+
+        } catch (error) { 
+            alert("ENGINE ERROR: " + error.message); 
+        } finally { 
+            btn.innerText = "Initialize Sequence"; btn.disabled = false; 
+        }
+    }
+
+    async function runMulti() {
+        let input = document.getElementById('multiStock').value.trim() || "RELIANCE.NS, TCS.NS, HDFCBANK.NS";
+        let price = document.getElementById('multiPrice').value;
+        let days = document.getElementById('multiDays').value;
+        let sims = document.getElementById('multiCount').value;
+        let tickers = input.split(',').map(t => t.trim());
+        
+        const btn = document.getElementById('btn-run-multi');
+        btn.innerText = "ANALYZING..."; btn.disabled = true;
+
+        const payloadBase = {
+            price: price ? parseFloat(price) : null,
+            days: days ? parseInt(days) : 252,
+            sims: sims ? parseInt(sims) : 1000
+        };
+
+        try {
+            const fetchPromises = tickers.map(ticker => 
+                fetch('http://127.0.0.1:5000/api/simulate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: ticker, ...payloadBase }) 
+                }).then(res => res.json())
+            );
+
+            const results = await Promise.all(fetchPromises);
+            const errorResult = results.find(r => r.error);
+            if(errorResult) throw new Error(errorResult.error);
+
+            document.getElementById('metrics-title').innerText = `Multi-Asset Risk Matrix | Output: ${payloadBase.days} Days / ${payloadBase.sims} Paths`;
+            let htmlContent = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; grid-column: span 3;">`;
+
+            let bestReturnStock = results[0];
+            let safestStock = results[0];
+            let optimalStock = results[0];
+            let maxRatio = -999;
+
+            results.forEach(res => {
+                let ret = res.metrics.annual_return;
+                let risk = Math.abs(res.metrics.var_95);
+                let ratio = risk === 0 ? 0 : ret / risk;
+
+                if (ret > bestReturnStock.metrics.annual_return) bestReturnStock = res;
+                if (risk < Math.abs(safestStock.metrics.var_95)) safestStock = res;
+                if (ratio > maxRatio) { maxRatio = ratio; optimalStock = res; }
+
+                htmlContent += `
+                    <div class="metric-box" style="padding: 25px;">
+                        <h4 style="color: #ffffff; margin-top: 0; font-size: 1.2rem; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">${res.ticker}</h4>
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 10px;"><span style="color:#64748b;">Invested:</span> <span style="color:#ffffff;">${formatCur(res.current_price)}</span></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 10px;"><span style="color:#64748b;">Exp. Return:</span> <span style="color:#10b981;">${formatPct(res.metrics.annual_return)}</span></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 10px;"><span style="color:#64748b;">VaR (95%):</span> <span style="color:#ef4444;">${formatPct(res.metrics.var_95)}</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#64748b;">Exp. Value:</span> <span style="color:#ffffff;">${formatCur(res.simulation.expected_final_price)}</span></div>
+                    </div>
+                `;
+            });
+            htmlContent += `</div>`;
+            document.getElementById('metrics').innerHTML = htmlContent;
+            document.getElementById('results').style.display = 'block';
+
+            const labels = results.map(r => r.ticker);
+            const returnValues = results.map(r => r.metrics.annual_return * 100);
+            const riskValues = results.map(r => Math.abs(r.metrics.var_95 * 100));
+
+            const traceReturn = { 
+                x: labels, y: returnValues, name: 'Expected Return (+)', type: 'bar', 
+                marker: { color: 'rgba(16, 185, 129, 0.4)', line: {color: '#10b981', width: 2} } 
+            };
+            const traceRisk = { 
+                x: labels, y: riskValues, name: '95% VaR / Potential Loss (-)', type: 'bar', 
+                marker: { color: 'rgba(239, 68, 68, 0.4)', line: {color: '#ef4444', width: 2} } 
+            };
+
+            document.getElementById('chart-section-title').innerText = "Risk vs. Reward Visualization";
+            Plotly.newPlot('chart', [traceReturn, traceRisk], {
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#94a3b8', family: 'Courier New' },
+                barmode: 'group',
+                xaxis: { gridcolor: 'rgba(255,255,255,0.05)', tickfont: {size: 14, color: '#f8fafc'} },
+                yaxis: { title: 'Percentage (%)', gridcolor: 'rgba(255,255,255,0.05)' },
+                margin: { l: 60, r: 20, t: 20, b: 40 },
+                legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' }
+            });
+
+            const verdictDiv = document.getElementById('verdict-container');
+            verdictDiv.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.05); border-left: 4px solid #10b981; padding: 25px; border-radius: 0 4px 4px 0;">
+                    <h4 style="color: #10b981; margin-top: 0; font-size: 1.1rem; letter-spacing: 2px; text-transform: uppercase;">
+                        ENGINE VERDICT: OPTIMAL ASSET is ${optimalStock.ticker}
+                    </h4>
+                    <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin-bottom: 0;">
+                        Based on the simulated parameters, <strong>${optimalStock.ticker}</strong> offers the best mathematical risk-adjusted return ratio. 
+                        While <strong>${bestReturnStock.ticker}</strong> promises the highest absolute growth ceiling (${formatPct(bestReturnStock.metrics.annual_return)}), it carries a downside VaR risk of ${formatPct(bestReturnStock.metrics.var_95)}. 
+                        If portfolio protection is your absolute priority, <strong>${safestStock.ticker}</strong> is the most defensive selection with a maximum simulated loss threshold of only ${formatPct(safestStock.metrics.var_95)}.
+                    </p>
+                </div>
+            `;
+            verdictDiv.style.display = 'block';
+
+        } catch (error) { 
+            alert("ENGINE ERROR: " + error.message); 
+        } finally { 
+            btn.innerText = "Run Comparison"; btn.disabled = false; 
+        }
+    }
+  </script>
+</body>
+</html>
